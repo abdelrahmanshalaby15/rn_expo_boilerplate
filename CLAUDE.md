@@ -44,8 +44,13 @@ npm run start      # expo start (dev server)
 npm run ios        # expo start --ios
 npm run android    # expo start --android
 npm run web        # expo start --web
-npm run lint       # expo lint
+npm run lint       # expo lint (flat config in eslint.config.js)
+npm run typecheck  # tsc --noEmit
 ```
+
+Linting is pinned and deterministic: `eslint` + `eslint-config-expo` are devDependencies
+and `eslint.config.js` is committed, so `expo lint` never auto-installs/configures at runtime
+(which previously broke CI under `npm ci`).
 
 ## Environments
 
@@ -76,6 +81,12 @@ CI/CD covers both platforms end to end:
   bundle id / package per `APP_ENV`), layered over the static `app.json`.
 
 GitHub Actions workflows in `.github/workflows/`:
+
+> **Repo layout note:** this directory (`boilerplate-app`) is the **Git repository root** — the
+> app files (`package.json`, `package-lock.json`, etc.) sit at the repo root, not under a nested
+> `boilerplate-app/`. Workflow paths (`working-directory`, `cache-dependency-path`, credential
+> file paths) are therefore relative to the repo root with **no `boilerplate-app/` prefix**. Keep
+> it that way unless the app is moved into a subdirectory.
 
 - `ci.yml` — on PRs / pushes: `npm ci` → `npm run typecheck` → `npm run lint`.
 - `eas-build.yml` — manual dispatch (pick environment / platform / submit) or branch push
@@ -109,4 +120,7 @@ Play service account, and the complete GitHub secrets table — is in
 
 - TypeScript strict; prefer the `@/` path aliases over relative `../../` chains.
 - Use the platform-suffix pattern (`*.web.tsx`) for web-specific component implementations.
-- Run `npm run lint` before committing.
+- Read per-environment values through `@/config/env`, not `process.env`/`Constants` directly.
+- Run `npm run typecheck` and `npm run lint` before committing — both are the CI gate (`ci.yml`).
+- ESLint exceptions should be scoped (line-level `eslint-disable-next-line`) with a reason
+  comment, as in `src/hooks/use-color-scheme.web.ts` (intentional hydration `setState`).
