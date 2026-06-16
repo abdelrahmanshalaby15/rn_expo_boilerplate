@@ -33,6 +33,21 @@ yarn-error.*
 # local env files
 .env*.local
 
+# EAS submit credentials (Google Play service account, etc.)
+credentials/
+
+# Fastlane fallback build path
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+*.ipa
+*.aab
+*.apk
+release.keystore
+play-service-account.json
+vendor/bundle/
+
 # typescript
 *.tsbuildinfo
 

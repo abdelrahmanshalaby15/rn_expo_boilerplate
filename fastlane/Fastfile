@@ -1,0 +1,93 @@
+# Fastlane fallback build path — an alternative to EAS Build/Submit.
+#
+# Flow per lane: `expo prebuild` generates the native ios/ android/ projects
+# from app.config.ts (driven by APP_ENV), then Fastlane builds and uploads them.
+#
+# This path requires you to manage signing yourself:
+#   iOS     — App Store Connect API key + `match` (or manual certs/profiles).
+#   Android — a release keystore + a Google Play service-account JSON.
+# See the comments below and CLAUDE.md for the required env vars / secrets.
+
+# APP_ENV selects the variant; defaults to development for local runs.
+APP_ENV = (ENV["APP_ENV"] || "development").freeze
+
+# Maps the env to its bundle id / Android package (mirrors app.config.ts) and
+# the Play Store / TestFlight distribution target.
+ENVIRONMENTS = {
+  "development" => { bundle: "io.vctors.boilerplate.dev",     play_track: "internal" },
+  "testing"     => { bundle: "io.vctors.boilerplate.test",    play_track: "internal" },
+  "staging"     => { bundle: "io.vctors.boilerplate.staging", play_track: "internal" },
+  "production"  => { bundle: "io.vctors.boilerplate",         play_track: "production" },
+}.freeze
+
+def env_config
+  ENVIRONMENTS.fetch(APP_ENV) do
+    UI.user_error!("Unknown APP_ENV '#{APP_ENV}'. Expected one of: #{ENVIRONMENTS.keys.join(', ')}")
+  end
+end
+
+# Generate the native project for a platform. `--clean` keeps prebuild
+# deterministic in CI; drop it locally if you maintain native changes by hand.
+def prebuild(platform)
+  sh("cd .. && APP_ENV=#{APP_ENV} npx expo prebuild --platform #{platform} --clean --non-interactive")
+end
+
+platform :ios do
+  desc "Build the iOS app and upload it to TestFlight"
+  lane :build do
+    prebuild("ios")
+
+    # App Store Connect API key auth (preferred over Apple ID + password).
+    app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_content: ENV["ASC_KEY_CONTENT"], # base64 or raw .p8 contents
+      is_key_content_base64: true,
+    )
+
+    # Sync signing assets. Requires a `match` git/storage repo to be configured;
+    # swap for `get_certificates` + `get_provisioning_profile` if not using match.
+    match(
+      type: APP_ENV == "production" ? "appstore" : "adhoc",
+      app_identifier: env_config[:bundle],
+      readonly: true,
+    )
+
+    build_app(
+      workspace: "ios/#{ENV['IOS_SCHEME'] || 'boilerplateapp'}.xcworkspace",
+      scheme: ENV["IOS_SCHEME"] || "boilerplateapp",
+      configuration: "Release",
+      export_method: APP_ENV == "production" ? "app-store" : "ad-hoc",
+    )
+
+    upload_to_testflight(skip_waiting_for_build_processing: true)
+  end
+end
+
+platform :android do
+  desc "Build the Android app bundle and upload it to Google Play"
+  lane :build do
+    prebuild("android")
+
+    # The keystore + credentials are read from env (see CLAUDE.md / secrets).
+    gradle(
+      project_dir: "android",
+      task: "bundle",
+      build_type: "Release",
+      properties: {
+        "android.injected.signing.store.file" => ENV["ANDROID_KEYSTORE_PATH"],
+        "android.injected.signing.store.password" => ENV["ANDROID_KEYSTORE_PASSWORD"],
+        "android.injected.signing.key.alias" => ENV["ANDROID_KEY_ALIAS"],
+        "android.injected.signing.key.password" => ENV["ANDROID_KEY_PASSWORD"],
+      },
+    )
+
+    upload_to_play_store(
+      package_name: env_config[:bundle],
+      track: env_config[:play_track],
+      json_key: ENV["GOOGLE_PLAY_JSON_KEY_PATH"],
+      aab: "android/app/build/outputs/bundle/release/app-release.aab",
+      skip_upload_apk: true,
+    )
+  end
+end

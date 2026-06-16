@@ -1,0 +1,114 @@
+name: Fastlane Build (fallback)
+
+# Self-managed build path that does NOT use EAS. Runs `expo prebuild` then
+# builds/uploads natively via Fastlane. Manual dispatch only — EAS
+# (eas-build.yml) remains the default automated path.
+#
+# Required secrets (set in repo settings):
+#   iOS     — ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_CONTENT (base64 .p8),
+#             APPLE_ID, APPLE_TEAM_ID, ASC_TEAM_ID, MATCH_PASSWORD,
+#             MATCH_GIT_URL (or your own signing setup)
+#   Android — ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+#             ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD, GOOGLE_PLAY_JSON_KEY
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Build profile to run
+        type: choice
+        default: staging
+        options: [development, testing, staging, production]
+      platform:
+        description: Target platform
+        type: choice
+        default: ios
+        options: [ios, android]
+
+concurrency:
+  group: fastlane-${{ github.ref }}-${{ github.event.inputs.platform }}
+  cancel-in-progress: false
+
+jobs:
+  ios:
+    name: iOS (${{ github.event.inputs.environment }})
+    if: ${{ github.event.inputs.platform == 'ios' }}
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: .
+    env:
+      APP_ENV: ${{ github.event.inputs.environment }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_TEAM_ID: ${{ secrets.ASC_TEAM_ID }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+          working-directory: .
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & upload (Fastlane)
+        run: bundle exec fastlane ios build
+
+  android:
+    name: Android (${{ github.event.inputs.environment }})
+    if: ${{ github.event.inputs.platform == 'android' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    env:
+      APP_ENV: ${{ github.event.inputs.environment }}
+      ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      GOOGLE_PLAY_JSON_KEY_PATH: ${{ github.workspace }}/play-service-account.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+          working-directory: .
+
+      - name: Decode signing secrets
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > release.keystore
+          echo '${{ secrets.GOOGLE_PLAY_JSON_KEY }}' > play-service-account.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & upload (Fastlane)
+        run: bundle exec fastlane android build

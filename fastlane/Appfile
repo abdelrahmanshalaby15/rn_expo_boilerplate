@@ -1,0 +1,13 @@
+# Identifiers are resolved per-environment in the Fastfile (from APP_ENV), so
+# these read from env vars rather than being hard-coded. Override per lane via
+# the matching env var if you need to.
+
+for_platform :ios do
+  apple_id(ENV["APPLE_ID"])              # Apple developer account email
+  team_id(ENV["APPLE_TEAM_ID"])          # Developer Portal team id
+  itc_team_id(ENV["ASC_TEAM_ID"])        # App Store Connect team id
+end
+
+for_platform :android do
+  json_key_file(ENV["GOOGLE_PLAY_JSON_KEY_PATH"]) # Play service-account JSON
+end
