@@ -6,6 +6,9 @@
       "@/*": [
         "./src/*"
       ],
+      "@/store": [
+        "./src/store/index.ts"
+      ],
       "@/assets/*": [
         "./assets/*"
       ]

@@ -26,11 +26,29 @@ Two pillars define the boilerplate's scope:
 - `react-native-web` for the web target.
 - `i18next` + `react-i18next` for translations, `expo-localization` for device-locale
   detection, with full **RTL** (Arabic) support. See [Internationalization](#internationalization-i18n).
+- **Redux Toolkit** + `react-redux` + `redux-persist` (on AsyncStorage) for client/global
+  state; **TanStack Query** v5 for server state. See [State & Data](#state--data).
 - Experiments enabled in `app.json`: `typedRoutes` and `reactCompiler`.
 
 ## Layout
 
+The code is **feature-based**: each feature owns its slice of the app, with a small set of
+shared/app-global layers around it.
+
 - `src/app/` — expo-router routes (file-based routing). `_layout.tsx` is the root layout.
+  Keep routes **thin** — they render a feature's screen/components.
+- `src/features/<feature>/` — self-contained features. A feature owns its `store/` (Redux
+  slice + selectors), `api/` (typed calls + DTO types), `hooks/`, `components/`, and optional
+  `screens/`. Each feature exposes a barrel `index.ts`. Two reference features ship:
+  `counter/` (client state via Redux) and `todos/` (server state via TanStack Query).
+- `src/store/` — Redux store wiring: `index.ts` (`configureStore` + persistor + `RootState`/
+  `AppDispatch`), `hooks.ts` (typed `useAppDispatch`/`useAppSelector`), `root-reducer.ts`
+  (the single place feature reducers are registered), `persist-config.ts` (redux-persist).
+- `src/services/` — cross-feature infra: `api-client.ts` (typed `fetch` wrapper + `ApiError`,
+  wired to `env.apiUrl`), `query-client.ts` (the TanStack `QueryClient` singleton),
+  `react-query-native.ts` (AppState focus bridge; NetInfo online bridge is an opt-in).
+- `src/providers/app-providers.tsx` — composes the Redux, redux-persist, and Query providers;
+  mounted once in `src/app/_layout.tsx`.
 - `src/components/` — shared UI. Platform variants use `.web.tsx` / `.tsx` suffixes.
 - `src/hooks/` — shared hooks (e.g. `use-color-scheme`, `use-theme`).
 - `src/i18n/` — internationalization: `config.ts` (locale registry), `index.ts` (i18next
@@ -39,7 +57,8 @@ Two pillars define the boilerplate's scope:
 - `src/config/env.ts` — typed runtime access to the active environment and config
   (`env.appEnv`, `env.apiUrl`, `env.isProduction`, …), read from Expo `extra` via
   `expo-constants`. Import `env` instead of reading `process.env`/`Constants` directly.
-- Path aliases: `@/*` → `./src/*`, `@/assets/*` → `./assets/*` (see `tsconfig.json`).
+- Path aliases: `@/*` → `./src/*`, `@/store` → `./src/store`, `@/assets/*` → `./assets/*`
+  (see `tsconfig.json`).
 
 ## Commands
 
@@ -99,6 +118,31 @@ The app ships translated and RTL-ready out of the box (English + Arabic).
   apply — this is expected, not a bug. On web the flag doesn't survive a reload, so the direction
   is applied to `document.dir` live instead (no reload). Use `start`/`end` (not `left`/`right`)
   for direction-sensitive styles so layouts mirror automatically.
+
+## State & Data
+
+Two distinct concerns, two tools — keep them separate:
+
+- **Client/global state → Redux Toolkit.** Create a slice in the feature's `store/`
+  (`createSlice`), register it once in `src/store/root-reducer.ts`, and read/write it through
+  the typed `useAppDispatch` / `useAppSelector` from `@/store/hooks` (never the raw react-redux
+  hooks). Expose a small facade hook (e.g. `useCounter`) so components don't touch Redux
+  directly. To **persist** a slice across restarts, add its key to the `whitelist` in
+  `src/store/persist-config.ts` — persistence is opt-in. `serializableCheck` is configured to
+  ignore redux-persist's actions; keep that if you touch the store middleware.
+- **Server state → TanStack Query.** Put a `useQuery`/`useMutation` hook in the feature's
+  `hooks/`, calling typed functions in the feature's `api/` that go through
+  `@/services/api-client` (`apiClient.get/post/...`). Never call `fetch` or read
+  `env`/`process.env` directly in a feature — the client owns base URL, headers, and the typed
+  `ApiError`. Do not duplicate server data into Redux; let the Query cache own it.
+- **Wiring.** `src/providers/app-providers.tsx` composes Redux → `PersistGate` (shows the splash
+  overlay until rehydration) → `QueryClientProvider`, and is mounted in `_layout.tsx`. On native,
+  queries refetch on app-foreground via the AppState focus bridge in
+  `src/services/react-query-native.ts`; the offline bridge (NetInfo) is a documented opt-in there
+  (needs `npx expo install @react-native-community/netinfo` + a dev-client rebuild).
+- **Reference features:** `src/features/counter/` (persisted Redux slice) and
+  `src/features/todos/` (TanStack Query). Both are mounted in the Explore screen's "State & data"
+  section. Point `env.apiUrl` at a JSONPlaceholder-style `/todos` API to see the query render.
 
 ## CI/CD
 

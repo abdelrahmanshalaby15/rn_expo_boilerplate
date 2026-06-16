@@ -11,6 +11,8 @@ import { ThemedView } from '@/components/themed-view';
 import { Collapsible } from '@/components/ui/collapsible';
 import { WebBadge } from '@/components/web-badge';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { CounterCard } from '@/features/counter';
+import { TodoList } from '@/features/todos';
 import { useTheme } from '@/hooks/use-theme';
 
 const code = <ThemedText type="code" />;
@@ -67,6 +69,15 @@ export default function TabTwoScreen() {
           <Collapsible title={t('explore.sections.language.title')} defaultOpen>
             <ThemedText type="small">{t('explore.sections.language.body')}</ThemedText>
             <LanguageSwitcher />
+          </Collapsible>
+
+          <Collapsible title="State & data">
+            <ThemedText type="small">
+              Redux Toolkit (persisted) for client state and TanStack Query for server state, both
+              wired in out of the box.
+            </ThemedText>
+            <CounterCard />
+            <TodoList />
           </Collapsible>
 
           <Collapsible title={t('explore.sections.routing.title')}>
