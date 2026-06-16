@@ -1,0 +1,56 @@
+{
+  "tabs": {
+    "home": "Home",
+    "explore": "Explore"
+  },
+  "home": {
+    "welcome": "Welcome to Expo",
+    "getStarted": "get started",
+    "tryEditing": "Try editing",
+    "devTools": "Dev tools",
+    "freshStart": "Fresh start",
+    "devMenu": {
+      "web": "use browser devtools",
+      "device": "shake device or press <code>m</code> in terminal",
+      "simulator": "press <code>{{shortcut}}</code>"
+    }
+  },
+  "explore": {
+    "title": "Explore",
+    "intro": "This starter app includes example code to help you get started.",
+    "docsLink": "Expo documentation",
+    "sections": {
+      "routing": {
+        "title": "File-based routing",
+        "screens": "This app has two screens: <code>src/app/index.tsx</code> and <code>src/app/explore.tsx</code>",
+        "layout": "The layout file in <code>src/app/_layout.tsx</code> sets up the tab navigator.",
+        "learnMore": "Learn more"
+      },
+      "platforms": {
+        "title": "Android, iOS, and web support",
+        "body": "You can open this project on Android, iOS, and the web. To open the web version, press <bold>w</bold> in the terminal running this project."
+      },
+      "images": {
+        "title": "Images",
+        "body": "For static images, you can use the <code>@2x</code> and <code>@3x</code> suffixes to provide files for different screen densities.",
+        "learnMore": "Learn more"
+      },
+      "themes": {
+        "title": "Light and dark mode components",
+        "body": "This template has light and dark mode support. The <code>useColorScheme()</code> hook lets you inspect what the user's current color scheme is, and so you can adjust UI colors accordingly.",
+        "learnMore": "Learn more"
+      },
+      "animations": {
+        "title": "Animations",
+        "body": "This template includes an example of an animated component. The <code>src/components/ui/collapsible.tsx</code> component uses the powerful <code>react-native-reanimated</code> library to animate opening this hint."
+      },
+      "language": {
+        "title": "Language & RTL",
+        "body": "This template ships with internationalization wired up. Switch the language below — choosing a right-to-left language flips the whole layout."
+      }
+    }
+  },
+  "language": {
+    "label": "Language"
+  }
+}
