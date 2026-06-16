@@ -24,6 +24,8 @@ Two pillars define the boilerplate's scope:
 - TypeScript in `strict` mode.
 - `react-native-reanimated` v4 + `react-native-worklets` for animation.
 - `react-native-web` for the web target.
+- `i18next` + `react-i18next` for translations, `expo-localization` for device-locale
+  detection, with full **RTL** (Arabic) support. See [Internationalization](#internationalization-i18n).
 - Experiments enabled in `app.json`: `typedRoutes` and `reactCompiler`.
 
 ## Layout
@@ -31,6 +33,8 @@ Two pillars define the boilerplate's scope:
 - `src/app/` — expo-router routes (file-based routing). `_layout.tsx` is the root layout.
 - `src/components/` — shared UI. Platform variants use `.web.tsx` / `.tsx` suffixes.
 - `src/hooks/` — shared hooks (e.g. `use-color-scheme`, `use-theme`).
+- `src/i18n/` — internationalization: `config.ts` (locale registry), `index.ts` (i18next
+  init), `use-locale.ts` (switch/persist/RTL hook), `locales/*.json` (translations).
 - `src/constants/` — `theme.ts` and other constants.
 - `src/config/env.ts` — typed runtime access to the active environment and config
   (`env.appEnv`, `env.apiUrl`, `env.isProduction`, …), read from Expo `extra` via
@@ -69,6 +73,32 @@ Implementation convention (to be wired up with `eas.json` build profiles + a dyn
 `app.config.ts`): select the environment via an `APP_ENV` / `EXPO_PUBLIC_*` variable and
 branch the app name, identifiers, and config from it. Keep secrets out of the repo — use EAS
 secrets / environment variables.
+
+## Internationalization (i18n)
+
+The app ships translated and RTL-ready out of the box (English + Arabic).
+
+- **Registry:** `src/i18n/config.ts` is the single source of truth — each locale has a
+  `label` and an `rtl` flag. Add a language by dropping `locales/<code>.json` next to the
+  others, adding an entry here, and importing it in `index.ts`. Everything else (device
+  fallback, switcher UI, RTL) is driven off this registry.
+- **Translations:** `locales/en.json` is the source of truth; `ar.json` mirrors its shape.
+  `en.json`'s type is fed back into `i18next` (`src/i18n/i18next.d.ts`) so `t()` /
+  `<Trans i18nKey>` keys are type-checked and autocompleted. Keep keys in parity (CI typecheck
+  catches drift in usage; the two files must stay structurally identical).
+- **Usage:** `const { t } = useTranslation()` then `t('home.welcome')`. For strings with inline
+  markup (e.g. `<code>…</code>`), use `<Trans i18nKey="…" components={{ code: <ThemedText … /> }} />`.
+- **Switching language:** `useLocale()` returns `{ locale, isRTL, locales, setLocale }`.
+  `setLocale(code)` persists the choice (AsyncStorage), changes the language, and — when the
+  text direction flips — applies `I18nManager.forceRTL` and **reloads the app** (`reloadAppAsync`
+  from `expo`) so the new layout direction takes effect. The `<LanguageSwitcher>` component (shown
+  on the Explore screen) is the reference UI.
+- **Startup:** `bootstrapLocale()` runs once in `src/app/_layout.tsx` and reconciles the saved
+  preference ↔ device locale ↔ RTL state, reloading at most once if the direction needs to change.
+- **RTL caveats:** on native, `forceRTL` persists across launches and **requires a reload** to
+  apply — this is expected, not a bug. On web the flag doesn't survive a reload, so the direction
+  is applied to `document.dir` live instead (no reload). Use `start`/`end` (not `left`/`right`)
+  for direction-sensitive styles so layouts mirror automatically.
 
 ## CI/CD
 
